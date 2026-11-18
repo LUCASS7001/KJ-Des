@@ -1,0 +1,44 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    # KJ Des is Windows-only; tests use Win32 APIs.
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.10 is the oldest supported Python.
+        python-version: ["3.10", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt pytest
+      # Installer (Inno Pascal) testleri derleyici olmadan sessizce atlanir;
+      # derleyici bulunamazsa is acikca basarisiz olur.
+      - name: Locate or install Inno Setup 6
+        shell: pwsh
+        run: |
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) { choco install innosetup --no-progress -y }
+          if (-not (Test-Path $iscc)) { throw "ISCC.exe bulunamadi: $iscc" }
+          # ISCC.exe surum kaynagi tasimaz; surum kaldirma kaydindan okunur.
+          $keys = 'HKLM:\SOFTWARE\WOW6432Node', 'HKLM:\SOFTWARE', 'HKCU:\Software' |
+            ForEach-Object { "$_\Microsoft\Windows\CurrentVersion\Uninstall\Inno Setup 6_is1" }
+          $version = ($keys | Where-Object { Test-Path $_ } | Select-Object -First 1 |
+            ForEach-Object { (Get-ItemProperty $_).DisplayVersion })
+          "Inno Setup: " + ($(if ($version) { $version } else { 'bilinmiyor' }))
+          "KJDES_ISCC=$iscc" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Compile sources
+        run: python -m compileall -q app tests scripts packaging
+      - name: Run tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest -q

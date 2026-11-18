@@ -1,0 +1,52 @@
+name: Bug report
+description: Something in KJ Des does not work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Security problems: please do **not** use this form — see SECURITY.md.
+        Remove personal data (usernames, IP addresses) from any logs you paste.
+  - type: input
+    id: version
+    attributes:
+      label: KJ Des version
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: windows
+    attributes:
+      label: Windows version
+      options: [Windows 11, Windows 10]
+    validations:
+      required: true
+  - type: dropdown
+    id: language
+    attributes:
+      label: UI language
+      options: [Arabic, Turkish, English]
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: message
+    attributes:
+      label: Message shown by KJ Des
+      description: The exact status or error text, if any.
+  - type: textarea
+    id: log
+    attributes:
+      label: Activity log excerpt
+      description: From Activity in KJ Des or %APPDATA%\KJ Des\kjdes.log (remove personal data).
+      render: text
+  - type: checkboxes
+    id: other-tools
+    attributes:
+      label: Other tools
+      options:
+        - label: Another bypass / VPN tool (GoodbyeDPI, Zapret, WARP, DPort, …) is installed or running

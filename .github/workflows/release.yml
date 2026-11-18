@@ -1,0 +1,54 @@
+name: Release build
+
+# Builds the portable folder and the installer for a version tag (v*) or on
+# manual request, and uploads them as workflow artifacts. It does NOT publish a
+# GitHub release: the maintainer reviews the artifacts and publishes manually.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest -q
+      - name: Icons
+        run: python packaging/make_icon.py
+      - name: PyInstaller
+        run: python -m PyInstaller --noconfirm --clean packaging/KJDes.spec
+      - name: Packaged self-test
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath dist\KJDes\KJDes.exe -ArgumentList '--self-test','build\self-test.png' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "self-test failed: $($p.ExitCode)" }
+      - name: Inno Setup
+        shell: pwsh
+        run: |
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) { choco install innosetup --no-progress -y }
+          & $iscc packaging\KJDes.iss
+          if ($LASTEXITCODE) { throw 'installer build failed' }
+          Get-ChildItem installer\KJDes-Setup-*.exe | ForEach-Object {
+            "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash)  $($_.Name)" |
+              Out-File -Encoding ascii "$($_.FullName).sha256"
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KJDes-${{ github.ref_name }}
+          path: |
+            installer/KJDes-Setup-*.exe
+            installer/KJDes-Setup-*.exe.sha256
+          if-no-files-found: error

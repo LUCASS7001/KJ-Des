@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Build outputs
+build/
+dist/
+installer/
+*.spec.tmp
+
+# Local release/build tooling
+scripts/Build.bat
+scripts/Kurulum-Yap.bat
+scripts/Temizle.bat
+# packaging/ is source (KJDes.iss, KJDes.spec); only generated output is ignored.
+packaging/Output/
+packaging/*.tmp
+packaging/*.bak
+Icon.html
+
+# Local app data and logs
+app/data/*.log
+app/data/config.json
+*.log
+
+# Local/editor files
+.venv/
+venv/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Test/downloaded update artifacts
+release_builds/
+app/data/updates/
+
+# Preview renders are kept in docs/screenshots
+build.log
+
+# Optional user-supplied artwork is tracked deliberately (app/assets/artwork.*)
+
+# Private records (business terms, permission correspondence) - never publish
+legal/
+*.private.*
+
+# Local runtime data from source runs
+app/data/
+docs/screenshots/_preview_config.json*
+
+# Secrets / signing material
+.env
+*.pfx
+*.p12
+*.pem
+*.key
+*.cer
+*.spc

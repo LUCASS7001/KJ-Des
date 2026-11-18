@@ -1,0 +1,33 @@
+KJ Des
+Copyright (c) 2026 Lucas
+
+This copyright notice covers the original KJ Des contributions (application
+design and user interface, localization, branding and artwork integration,
+the connection lifecycle and recovery layer, packaging, documentation and the
+tests written for KJ Des).
+
+No open-source license is granted for KJ Des at this time. Unless and until
+explicit license terms are published, all rights are reserved: copying,
+modifying or redistributing this software requires the permission of the
+respective copyright holders.
+
+-------------------------------------------------------------------------------
+Inherited code
+-------------------------------------------------------------------------------
+Portions of KJ Des (the Windows connection engine, DNS/hosts handling, the
+recovery task and parts of the installer and test suite) are derived from a
+third-party project whose author retains the copyright in those portions:
+
+    DPort — https://github.com/IzzmooPro/DPort
+    Copyright (c) IzzmooPro
+
+That project does not include a license file. Its code is included in KJ Des,
+in modified form, with the permission of its author and not under an
+open-source license. Nothing in this file grants any right in those portions.
+The affected files are listed in NOTICE.md.
+
+-------------------------------------------------------------------------------
+Third-party components
+-------------------------------------------------------------------------------
+Third-party software bundled with KJ Des remains under its own license; see
+NOTICE.md and the licenses/ directory.

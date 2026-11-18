@@ -1,0 +1,3 @@
+# KJ Des runtime dependencies (pinned for reproducible builds)
+# Only QtCore/QtGui/QtWidgets are used, so the slim "Essentials" wheel suffices.
+PySide6-Essentials==6.12.0
