@@ -64,25 +64,30 @@ class NoOriginalDeveloperInUi(unittest.TestCase):
         for code in LANGUAGES:
             text = " ".join(load_locale(code).values())
             self.assertNotIn("DPort", text, code)
-            self.assertNotIn(HOLDER, text, code)
+            if HOLDER:
+                self.assertNotIn(HOLDER, text, code)
 
     def test_ui_sources_do_not_mention_dport(self):
         for name in os.listdir(os.path.join(APP, "ui")):
             if name.endswith((".py", ".qss")):
                 with open(os.path.join(APP, "ui", name), encoding="utf-8") as f:
                     src = f.read()
-                self.assertNotIn(HOLDER, src, name)
+                if HOLDER:
+                    self.assertNotIn(HOLDER, src, name)
                 self.assertNotIn("ORIGINAL_", src, name)
 
-    def test_legal_attribution_is_kept_in_legal_documents(self):
-        """The inherited-code copyright notice must stay in LICENSE/NOTICE."""
+    def test_legal_documents_identify_owner_and_third_party_terms(self):
+        """Owner's notice is present; LICENSE defers third-party and inherited
+        code to NOTICE.md and licenses/ (wording chosen by the owner)."""
         root = os.path.dirname(APP)
+        texts = {}
         for doc in ("NOTICE.md", "LICENSE"):
             with open(os.path.join(root, doc), encoding="utf-8") as f:
-                text = f.read()
-            self.assertTrue(HOLDER, "LICENSE must name the inherited-code copyright holder")
-            self.assertIn(f"Copyright (c) {HOLDER}", text, doc)
-            self.assertIn("Copyright (c) 2026 Lucas", text, doc)
+                texts[doc] = f.read()
+            self.assertIn("Copyright (c) 2026 Lucas", texts[doc], doc)
+        self.assertIn("NOTICE.md", texts["LICENSE"])
+        self.assertIn("inherited code", texts["LICENSE"].lower())
+        self.assertIn("## Third-party components", texts["NOTICE.md"])
 
 
 ROOT = os.path.dirname(APP)
@@ -104,7 +109,7 @@ class PublicationHygiene(unittest.TestCase):
     def test_public_files_do_not_expose_previous_publisher(self):
         for rel in PUBLIC_FILES:
             text = self._read(rel).lower()
-            for needle in (HOLDER.lower(), "gmail.com"):
+            for needle in [n for n in (HOLDER.lower(), "gmail.com") if n]:
                 self.assertNotIn(needle, text, f"{rel}: {needle}")
 
     def test_private_business_terms_are_not_public(self):

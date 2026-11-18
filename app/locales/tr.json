@@ -96,5 +96,6 @@
   "exiting": "Ayarlar geri yükleniyor ve çıkılıyor…",
   "fatal_title": "KJ Des — Hata",
   "fatal_elevation": "KJ Des yönetici izniyle başlatılamadı.\n\nDNS ve hosts ayarlarını değiştirdiği için bu izin olmadan çalışamaz. Tekrar deneyip Evet'i seçin.",
-  "fatal_unexpected": "Beklenmeyen bir hata oluştu:\n\n{error}"
+  "fatal_unexpected": "Beklenmeyen bir hata oluştu:\n\n{error}",
+  "diagnose_done": "Tanılama raporu kaydedildi (hiçbir şey değiştirilmedi):\n\n{path}"
 }

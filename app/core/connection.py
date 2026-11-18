@@ -229,6 +229,8 @@ class ConnectionManager:
         adapters = self._safe(ops.active_adapters, []) or []
         if not adapters:
             return "err_no_adapter"
+        self._log("DNS | active adapters: " + ", ".join(
+            f"{a.get('name')!r}[{a.get('source', '?')}]" for a in adapters))
         try:
             self.dns.backup(adapters)
         except Exception as exc:

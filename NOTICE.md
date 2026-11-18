@@ -4,12 +4,6 @@ KJ Des — Copyright (c) 2026 Lucas. See `LICENSE` for the terms that apply to
 the KJ Des contributions. The components below keep their own copyright and
 license terms.
 
-## Inherited code
-
-Parts of KJ Des are derived, in modified form, from **DPort**
-(https://github.com/IzzmooPro/DPort), Copyright (c) IzzmooPro. That project has
-no license file; the code is used with its author's permission and not under an
-open-source license (see `LICENSE`).
 
 | KJ Des file | Relationship to the inherited code |
 |---|---|

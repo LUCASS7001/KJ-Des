@@ -6,7 +6,7 @@
 ; ─────────────────────────────────────────────────────────────────────────
 
 #define MyAppName "KJ Des"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "Lucas"
 #define MyAppURL "https://github.com/LUCASS7001"
 #define MyAppExeName "KJDes.exe"

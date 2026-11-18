@@ -96,5 +96,6 @@
   "exiting": "Restoring settings and exiting…",
   "fatal_title": "KJ Des — Error",
   "fatal_elevation": "KJ Des could not start with administrator permission.\n\nIt changes DNS and hosts settings and cannot work without it. Please try again and choose Yes.",
-  "fatal_unexpected": "An unexpected error occurred:\n\n{error}"
+  "fatal_unexpected": "An unexpected error occurred:\n\n{error}",
+  "diagnose_done": "Diagnostics saved (nothing was changed):\n\n{path}"
 }

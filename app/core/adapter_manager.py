@@ -57,6 +57,7 @@ def _get_all_adapters_powershell() -> List[Dict]:
                     "admin_state": "Enabled" if enabled else "Disabled",
                     "state": "Connected" if status_l == "up" else status or "Disconnected",
                     "type": item.get("InterfaceDescription") or "",
+                    "source": "powershell",
                 }
             )
         return [a for a in adapters if a["name"]]
@@ -113,6 +114,7 @@ def _get_all_adapters_netsh() -> List[Dict]:
                         "admin_state": admin,
                         "state": state,
                         "type": itype,
+                        "source": "netsh",
                     }
                 )
         return adapters

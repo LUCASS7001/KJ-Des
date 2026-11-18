@@ -96,5 +96,6 @@
   "exiting": "جارٍ استعادة الإعدادات والخروج…",
   "fatal_title": "KJ Des — خطأ",
   "fatal_elevation": "تعذّر تشغيل KJ Des بإذن المسؤول.\n\nيغيّر البرنامج إعدادات DNS وملف hosts ولا يمكنه العمل دون هذا الإذن. حاول مجددًا واختر «نعم».",
-  "fatal_unexpected": "حدث خطأ غير متوقع:\n\n{error}"
+  "fatal_unexpected": "حدث خطأ غير متوقع:\n\n{error}",
+  "diagnose_done": "تم حفظ تقرير التشخيص (لم يتم تغيير أي شيء):\n\n{path}"
 }

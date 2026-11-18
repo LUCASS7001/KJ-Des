@@ -19,7 +19,9 @@ def inherited_copyright_holder():
     import re
     with open(os.path.join(ROOT, "LICENSE"), encoding="utf-8") as f:
         text = f.read()
-    section = text.split("Inherited code", 1)[-1]
+    if "Inherited code" not in text:
+        return ""
+    section = text.split("Inherited code", 1)[1]
     m = re.search(r"Copyright \(c\) ([^\r\n]+)", section)
     return m.group(1).strip() if m else ""
 

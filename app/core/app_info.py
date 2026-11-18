@@ -6,7 +6,7 @@ Single source of truth for the KJ Des application identity.
 APP_NAME = "KJ Des"
 APP_ID = "KJDes"                 # file/registry-safe identifier
 APP_EXE_NAME = "KJDes.exe"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.1"
 APP_PUBLISHER = "Lucas"
 APP_DEVELOPER = "Lucas"
 APP_DESCRIPTION = "A Windows desktop connectivity utility for Discord."

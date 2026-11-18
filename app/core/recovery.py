@@ -65,7 +65,11 @@ class DnsRecovery:
             backup = self.current()
             for adapter in adapters:
                 name = adapter["name"]
-                current = self._ops.get_dns(name)
+                try:
+                    current = self._ops.get_dns(name)
+                except Exception as exc:
+                    # Same fail-closed behaviour; the log now names the adapter.
+                    raise DnsBackupError(f"adapter={name!r}: {exc}") from exc
                 if name not in backup:
                     backup[name] = current
                 backup[name] = self._ops.normalize_snapshot(backup[name])

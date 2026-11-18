@@ -6,7 +6,7 @@
 
 **A Windows desktop connectivity utility for Discord.**
 
-Windows 10 / 11 · العربية · Türkçe · English · v1.0.0
+Windows 10 / 11 · العربية · Türkçe · English · v1.0.1
 
 </div>
 
@@ -198,13 +198,11 @@ The creator name and links in the About dialog come from `app/branding.json`
 
 ## License
 
-KJ Des is **not** released under an open-source license; all rights are
-reserved (see [LICENSE](LICENSE)). The software includes inherited code that is
-used with its author's permission and third-party components under their own
-licenses — see [NOTICE.md](NOTICE.md).
+KJ Des is proprietary software and is not released under an open-source license. All rights are reserved. See [LICENSE](LICENSE).
 
-Discord is a trademark of Discord Inc. KJ Des is not affiliated with or
-endorsed by Discord Inc.
+Third-party components and inherited code remain subject to their respective copyright notices and license terms. See [NOTICE.md](NOTICE.md) and the [licenses/](licenses/) directory.
+
+Discord is a trademark of Discord Inc. KJ Des is not affiliated with, sponsored by, or endorsed by Discord Inc.
 
 ## Maintainer
 

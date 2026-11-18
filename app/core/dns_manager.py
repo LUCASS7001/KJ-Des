@@ -54,6 +54,31 @@ def normalize_snapshot(snapshot):
     return clean
 
 
+_KNOWN_FAILURES = ("Adapter not uniquely resolved", "DNS registry key unavailable",
+                   "Invalid NameServer type", "DNS family unavailable")
+
+
+def powershell_failure_reason(stderr) -> str:
+    """Short, single-line reason from PowerShell's error output.
+
+    Our own `throw` texts are returned verbatim (they contain no user data).
+    Otherwise the error-id line or the first error line is returned, collapsed
+    and capped, so a policy block (e.g. constrained language mode), a missing
+    module or an antivirus block can be told apart in the log."""
+    text = stderr if isinstance(stderr, str) else ""
+    for line in text.splitlines():
+        for known in _KNOWN_FAILURES:
+            if known in line:
+                start = line.index(known)
+                return " ".join(line[start:].split())[:160]
+    lines = [" ".join(l.split()) for l in text.splitlines() if l.strip()]
+    error_id = next((l.split(":", 1)[1].strip() for l in lines
+                     if l.lstrip("+ ").startswith("FullyQualifiedErrorId")), "")
+    first = lines[0] if lines else "no error output"
+    reason = f"{first} [{error_id}]" if error_id else first
+    return reason[:200]
+
+
 def get_dns(adapter_name: str) -> Dict:
     """Read effective DNS via CIM and static source via per-interface NameServer.
 
@@ -73,14 +98,16 @@ $result = @{interface_guid=$guid}
 foreach ($family in @(@('ipv4','Tcpip','IPv4'), @('ipv6','Tcpip6','IPv6'))) {
     $path = 'SYSTEM\CurrentControlSet\Services\' + $family[1] + '\Parameters\Interfaces\{' + $guid + '}'
     $key = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey($path, $false)
-    if ($null -eq $key) { throw 'DNS registry key unavailable' }
+    if ($null -eq $key) { throw ('DNS registry key unavailable: ' + $family[0]) }
     try {
         $raw = $key.GetValue('NameServer', '')
-        if ($raw -isnot [string]) { throw 'Invalid NameServer type' }
+        if ($raw -isnot [string]) { throw ('Invalid NameServer type: ' + $family[0]) }
         $static = @($raw -split '[,;\s]+' | Where-Object { $_ })
     } finally { $key.Dispose() }
-    $rows = @(Get-DnsClientServerAddress -InterfaceIndex $adapter.ifIndex -AddressFamily $family[2])
-    if ($rows.Count -ne 1) { throw 'DNS family unavailable' }
+    try {
+        $rows = @(Get-DnsClientServerAddress -InterfaceIndex $adapter.ifIndex -AddressFamily $family[2])
+    } catch { throw ('DNS family unavailable: ' + $family[0] + ' (no DNS client entry)') }
+    if ($rows.Count -ne 1) { throw ('DNS family unavailable: ' + $family[0] + ' (rows=' + $rows.Count + ')') }
     $result[$family[0]] = @{dhcp=($static.Count -eq 0); servers=$static; effective=@($rows[0].ServerAddresses)}
 }
 $result | ConvertTo-Json -Depth 5 -Compress
@@ -92,7 +119,10 @@ $result | ConvertTo-Json -Depth 5 -Compress
             timeout=15, creationflags=subprocess.CREATE_NO_WINDOW,
         )
         if result.returncode:
-            raise DnsSnapshotError("Windows DNS sorgusu basarisiz")
+            # Fail closed exactly as before; only the reason is now recorded.
+            raise DnsSnapshotError(
+                f"Windows DNS sorgusu basarisiz | neden={powershell_failure_reason(result.stderr)}"
+                f" | kod={result.returncode}")
         raw = json.loads(result.stdout.lstrip("\ufeff"))
         clean = normalize_snapshot(raw)
         for family in ("ipv4", "ipv6"):

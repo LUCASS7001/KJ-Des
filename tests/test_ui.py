@@ -233,10 +233,10 @@ class UiTests(unittest.TestCase):
         process()
         texts = " ".join(self._about_texts())
         from fakes import inherited_copyright_holder
-        for forbidden in ("DPort", inherited_copyright_holder()):
+        for forbidden in [f for f in ("DPort", inherited_copyright_holder()) if f]:
             self.assertNotIn(forbidden, texts)
         self.assertIn("Lucas (KJ)", texts)
-        self.assertEqual(about.version_badge.text(), "v1.0.0")
+        self.assertEqual(about.version_badge.text(), "v1.0.1")
         self.assertEqual(about.creator_role.text(), "مطوّر برمجيات · مصمّم · صانع أدوات")
         self.assertEqual(about.footer.text(), "صُنع بشغف بواسطة Lucas")
         self.assertEqual(len(about.features), 3)

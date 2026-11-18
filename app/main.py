@@ -13,6 +13,9 @@ Developer flags (ignored by the packaged executable):
   --source-dev   run from source without an installed recovery target
   --no-elevate   open the UI without administrator rights (connection will
                  honestly fail with a permission error)
+
+Support flag (also in the packaged executable):
+  --diagnose     write a read-only diagnostics report and exit
 """
 import ctypes
 import os
@@ -51,6 +54,28 @@ def _localized(key: str, **kw) -> tuple:
         return i18n.t("fatal_title"), i18n.t(key, **kw)
     except Exception:
         return "KJ Des", key
+
+
+def diagnose_mode() -> int:
+    """Read-only diagnostics report: %APPDATA%\\KJ Des\\diagnostics.txt.
+
+    Dispatched before the single-instance check, elevation and Qt, so it never
+    opens a window, never signals a running KJ Des, never starts the relay and
+    changes nothing. Exit codes: 0 = no blocking problem found, 2 = report
+    written but the app would refuse to connect, 1 = report not produced."""
+    try:
+        from core.diagnose import EXIT_FAILED, exit_code, run
+        from core.paths import user_data_path
+        summary: dict = {}
+        run(user_data_path("diagnostics.txt"), summary)
+        return exit_code(summary)
+    except Exception:
+        try:
+            from core.diagnostics import write_crash
+            write_crash()
+        except Exception:
+            pass
+        return 1
 
 
 def cleanup_hosts_mode() -> int:
@@ -113,6 +138,8 @@ def main() -> int:
     global _mutex_handle
     if "--cleanup-hosts" in sys.argv:
         return cleanup_hosts_mode()
+    if "--diagnose" in sys.argv:
+        return diagnose_mode()
     if "--self-test" in sys.argv:
         idx = sys.argv.index("--self-test")
         target = sys.argv[idx + 1] if len(sys.argv) > idx + 1 else "kjdes-self-test.png"

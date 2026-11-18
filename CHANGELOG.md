@@ -2,32 +2,18 @@
 
 All notable changes to KJ Des are documented here.
 
-## Unreleased
+## 1.0.1 — 2026-11-18
 
-### Added
-- About dialog: KJ Des brand hero, version badge, description, three feature
-  cards, creator card (Lucas) with Instagram, GitHub and Discord username,
-  footer with a Licenses link. Fully localized (Arabic RTL / Turkish / English).
-- Creator name, Discord username and social links configurable in `app/branding.json`.
-- New brand mark (angular K, metallic purple gradient, glow); regenerated ICO/PNG
-  assets and installer header images.
-- Official artwork in the main window and About dialog.
-- Connecting checks that `127.0.0.1:443` is free before any DNS or hosts change.
-- Repository: README, SECURITY, CONTRIBUTING, issue and pull-request templates,
-  release build workflow.
-
-### Fixed
-- Installer: uninstall residue checks now consider only KJ Des's own marked
-  hosts block and DNS backup; other tools' hosts blocks and unmarked lines are ignored.
-- Installer: no longer edits another application's uninstall entry (a wrong
-  AppId had been inherited) and no longer deletes another application's
-  recovery task name.
-- Installer: uninstall warnings are localized and list exactly what is still
-  unrestored; nothing is force-deleted.
-
-### Changed
-- Publisher and executable/installer metadata now identify Lucas / KJ Des.
-- Inherited-code and third-party notices consolidated in `LICENSE` and `NOTICE.md`.
+### Added — diagnostics
+- `KJDes.exe --diagnose`: read-only report written to `%APPDATA%\KJ Des\diagnostics.txt`
+  (adapters KJ Des would back up and whether each one's DNS can be read; strict TLS
+  result for every DoH provider with the presented certificate chain and whether its
+  root is in the Windows store; a DoH resolution test). Runs before the single-instance
+  check, elevation and the UI: no window, no relay, nothing changed. Exit code 0 = no
+  blocking problem, 2 = the app would refuse to connect, 1 = report not produced.
+- A failed Windows DNS snapshot now logs its reason (e.g. `DNS family unavailable: ipv4`)
+  and the adapter name; the active adapter list and its discovery source are logged.
+  Behaviour is unchanged: if any adapter cannot be read, nothing is modified.
 
 ## 1.0.0 — 2026-11-18
 
@@ -59,3 +45,28 @@ used with its author's permission (see `NOTICE.md`).
 - Own hosts markers, scheduled-task name, data folders and IPC identifiers;
   other applications' resources are never touched.
 - Removed the inherited Tk GUI, Discord version tile and GitHub updater.
+
+### Added (public snapshot)
+- About dialog: KJ Des brand hero, version badge, description, three feature
+  cards, creator card (Lucas) with Instagram, GitHub and Discord username,
+  footer with a Licenses link. Fully localized (Arabic RTL / Turkish / English).
+- Creator name, Discord username and social links configurable in `app/branding.json`.
+- New brand mark (angular K, metallic purple gradient, glow); regenerated ICO/PNG
+  assets and installer header images.
+- Official artwork in the main window and About dialog.
+- Connecting checks that `127.0.0.1:443` is free before any DNS or hosts change.
+- Repository: README, SECURITY, CONTRIBUTING, issue and pull-request templates,
+  release build workflow.
+
+### Fixed
+- Installer: uninstall residue checks now consider only KJ Des's own marked
+  hosts block and DNS backup; other tools' hosts blocks and unmarked lines are ignored.
+- Installer: no longer edits another application's uninstall entry (a wrong
+  AppId had been inherited) and no longer deletes another application's
+  recovery task name.
+- Installer: uninstall warnings are localized and list exactly what is still
+  unrestored; nothing is force-deleted.
+
+### Changed
+- Publisher and executable/installer metadata now identify Lucas / KJ Des.
+- Inherited-code and third-party notices consolidated in `LICENSE` and `NOTICE.md`.
