@@ -6,7 +6,7 @@
 ; ─────────────────────────────────────────────────────────────────────────
 
 #define MyAppName "KJ Des"
-#define MyAppVersion "1.0.3"
+#define MyAppVersion "1.0.4"
 #define MyAppPublisher "Lucas"
 #define MyAppURL "https://github.com/LUCASS7001"
 #define MyAppExeName "KJDes.exe"
@@ -79,6 +79,9 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 arabic.ActiveConnectionBlock=يرجى فصل الاتصال في KJ Des واستعادة الإعدادات الافتراضية قبل التحديث. أُلغي التثبيت.
 turkish.ActiveConnectionBlock=Güncelleme için önce KJ Des'te Varsayılana Dönün. Kurulum iptal edildi.
 english.ActiveConnectionBlock=Restore Defaults in KJ Des before updating. Setup was cancelled.
+arabic.PendingRestoreRunning=KJ Des يعمل ولم يُكمل بعد استعادة إعدادات DNS الأصلية. أغلق KJ Des من قائمة شريط المهام (خروج) ثم شغّل التثبيت مجددًا. نسختك الاحتياطية من DNS محفوظة ولم يُغيَّر شيء.
+turkish.PendingRestoreRunning=KJ Des çalışıyor ve orijinal DNS ayarlarınızı henüz geri yüklemedi. KJ Des'i tepsi menüsünden (Çıkış) kapatıp kurulumu yeniden çalıştırın. DNS yedeğiniz korunuyor; hiçbir şey değiştirilmedi.
+english.PendingRestoreRunning=KJ Des is running and has not finished restoring your original DNS settings. Quit KJ Des from the tray menu (Exit), then run Setup again. Your DNS backup is kept and nothing was changed.
 arabic.PassiveCloseFailed=تعذّر إغلاق KJ Des بأمان. أُلغي التثبيت؛ أغلق KJ Des وحاول مجددًا.
 turkish.PassiveCloseFailed=KJ Des güvenli biçimde kapatılamadı. Kurulum iptal edildi; KJ Des'i kapatıp yeniden deneyin.
 english.PassiveCloseFailed=KJ Des could not be closed safely. Setup was cancelled; close KJ Des and try again.
@@ -1144,21 +1147,35 @@ end;
 { What KJ Des still has to restore, one localized line per item ('' = nothing).
   Only KJ Des's own state is inspected: its DNS backup and its marked hosts
   block. An unreadable hosts file counts as "not restored" (fail closed). }
-function RestoreProblems(): string;
+function DnsBackupPresent(): Boolean;
+begin
+  Result := FileExists(ExpandConstant('{commonappdata}\KJ Des\dns_state.json'));
+end;
+
+{ KJ Des's marked hosts block is present, or the hosts file cannot be read
+  (fail closed: treated as present). }
+function KJDesHostsResidue(): Boolean;
 var
   Lines: TArrayOfString;
   HostsPath: string;
 begin
-  Result := '';
-  if FileExists(ExpandConstant('{commonappdata}\KJ Des\dns_state.json')) then
-    Result := Result + CustomMessage('ResidueDns') + #13#10;
+  Result := False;
   HostsPath := HostsFilePath();
   if FileExists(HostsPath) then begin
     if not LoadStringsFromFile(HostsPath, Lines) then
-      Result := Result + CustomMessage('ResidueHosts') + #13#10
+      Result := True
     else if HostsHasKJDesResidue(Lines) then
-      Result := Result + CustomMessage('ResidueHosts') + #13#10;
+      Result := True;
   end;
+end;
+
+function RestoreProblems(): string;
+begin
+  Result := '';
+  if DnsBackupPresent() then
+    Result := Result + CustomMessage('ResidueDns') + #13#10;
+  if KJDesHostsResidue() then
+    Result := Result + CustomMessage('ResidueHosts') + #13#10;
 end;
 
 function ConnectionRequiresRestore(): Boolean;
@@ -1461,9 +1478,73 @@ begin
   end;
 end;
 
+{ ===== KJDES UPGRADE DECISION BEGIN ===== }
+{ Upgrade over an installation that left ONLY its DNS backup behind (e.g. a
+  1.0.1 restore that could not finish, GitHub issue #1). Setup itself never
+  reads, changes or deletes the backup or any DNS setting; it only replaces
+  the program files so the newer app can run its own startup recovery. }
+const
+  UPGRADE_PROCEED = 0;        { nothing pending: normal passive-close path }
+  UPGRADE_KEEP_BACKUP = 1;    { only the DNS backup is pending, KJ Des not running }
+  UPGRADE_BLOCK_ACTIVE = 2;   { KJ Des hosts block present / hosts unreadable }
+  UPGRADE_BLOCK_RUNNING = 3;  { backup pending and KJ Des running, or unknown }
+
+function UpgradeDecision(BackupPresent, HostsResidue, RunningKnown, Running: Boolean): Integer;
+begin
+  if HostsResidue then
+    Result := UPGRADE_BLOCK_ACTIVE
+  else if not BackupPresent then
+    Result := UPGRADE_PROCEED
+  else if (not RunningKnown) or Running then
+    Result := UPGRADE_BLOCK_RUNNING
+  else
+    Result := UPGRADE_KEEP_BACKUP;
+end;
+{ ===== KJDES UPGRADE DECISION END ===== }
+
+{ Is ANY KJDes.exe process running (any path)? The DNS backup is machine-wide,
+  so any instance may be working on it. False = the answer is unknown. }
+function AnyKJDesRunning(var Running: Boolean): Boolean;
+var
+  Code: Integer;
+begin
+  Result := False;
+  Running := True;
+  if not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+    '-NoProfile -NonInteractive -Command "if (@(Get-Process -Name KJDes -ErrorAction SilentlyContinue).Count -gt 0) { exit 10 } else { exit 20 }"',
+    '', SW_HIDE, ewWaitUntilTerminated, Code) then exit;
+  if Code = 10 then begin Running := True; Result := True; end
+  else if Code = 20 then begin Running := False; Result := True; end;
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): string;
+var
+  Known, Running, Backup, Residue: Boolean;
 begin
   Result := '';
+  Backup := DnsBackupPresent();
+  Residue := KJDesHostsResidue();
+  Known := False;
+  Running := True;
+  if Backup and not Residue then
+    Known := AnyKJDesRunning(Running);
+  case UpgradeDecision(Backup, Residue, Known, Running) of
+    UPGRADE_BLOCK_ACTIVE: begin
+      Log('KJ Des: hosts yonlendirmesi aktif/okunamadi; kurulum iptal edildi');
+      Result := ExpandConstant('{cm:ActiveConnectionBlock}');
+      exit;
+    end;
+    UPGRADE_BLOCK_RUNNING: begin
+      Log('KJ Des: DNS yedegi bekliyor ve KJ Des calisiyor/bilinmiyor; kurulum iptal edildi');
+      Result := ExpandConstant('{cm:PendingRestoreRunning}');
+      exit;
+    end;
+    UPGRADE_KEEP_BACKUP: begin
+      { Nothing runs, nothing is closed; the backup stays for the new app. }
+      Log('KJ Des: yalniz DNS yedegi bekliyor, KJ Des calismiyor; yukseltme devam ediyor, yedek korunuyor');
+      exit;
+    end;
+  end;
   if ConnectionRequiresRestore() then begin
     Log('KJ Des: aktif veya bilinmeyen baglanti durumu; zorla kapatma oncesi kurulum iptal edildi');
     Result := ExpandConstant('{cm:ActiveConnectionBlock}');

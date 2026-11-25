@@ -2,6 +2,20 @@
 
 All notable changes to KJ Des are documented here.
 
+## 1.0.4 — 2026-11-25
+
+### Fixed
+- Updating was impossible for users whose previous version could not finish
+  restoring DNS (GitHub issue #1): the old uninstaller refused because the DNS
+  backup still existed, and the new installer refused for the same reason.
+  Setup now installs over the existing version when only the DNS backup is
+  pending, KJ Des' hosts block is absent and no KJ Des process is running.
+  Setup never reads, changes or deletes the backup or any DNS setting; the
+  updated app resolves the backup at its next start (identity-checked restore,
+  otherwise the backup is kept). If KJ Des is still running, setup asks to quit
+  it first; an active connection still blocks the update as before. Uninstall
+  remains blocked while the backup is unresolved.
+
 ## 1.0.3 — 2026-11-25
 
 Version 1.0.2 was not released as an application version (the `v1.0.2` Git tag
