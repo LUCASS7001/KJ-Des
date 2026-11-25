@@ -152,7 +152,7 @@ class ConnectionManager:
             if clean:
                 self._set(state=State.DISCONNECTED, error=None, restore_pending=False)
             else:
-                self._set(state=State.ERROR, error="err_restore_partial", restore_pending=True)
+                self._set(state=State.ERROR, error=self._restore_error(), restore_pending=True)
             self._read_dns_locked()
             return clean
 
@@ -230,7 +230,9 @@ class ConnectionManager:
         if not adapters:
             return "err_no_adapter"
         self._log("DNS | active adapters: " + ", ".join(
-            f"{a.get('name')!r}[{a.get('source', '?')}]" for a in adapters))
+            f"{a.get('name')!r}[{a.get('source', '?')}"
+            f"{', if=' + str(a['if_index']) if a.get('if_index') is not None else ''}]"
+            for a in adapters))
         try:
             self.dns.backup(adapters)
         except Exception as exc:
@@ -351,13 +353,16 @@ class ConnectionManager:
                       step=None, error=error_if_clean, connected_since=None,
                       routed=0, restore_pending=False)
         else:
-            self._set(state=State.ERROR, step=None, error="err_restore_partial",
+            self._set(state=State.ERROR, step=None, error=self._restore_error(),
                       connected_since=None,
                       routed=len(self._safe(self._ops.routed_hosts, []) or []),
                       restore_pending=True)
         self._log(f"CONNECTION | {context} | fully_restored={ok}")
         self._read_dns_locked()
         return ok
+
+    def _restore_error(self) -> str:
+        return "err_restore_identity" if self.dns.identity_blocked else "err_restore_partial"
 
     # --------------------------------------------------------- watchdog
     def _start_watchdog(self) -> None:
@@ -412,7 +417,7 @@ class ConnectionManager:
             if not adapters:
                 self._set(dns=None, dns_secure=False)
                 return
-            v4 = self._ops.get_dns(adapters[0]["name"])["ipv4"]
+            v4 = self._ops.get_dns(adapters[0]["name"], adapters[0].get("guid"))["ipv4"]
             if v4["dhcp"] or not v4.get("primary"):
                 self._set(dns="auto", dns_secure=False)
             else:

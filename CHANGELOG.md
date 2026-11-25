@@ -2,9 +2,64 @@
 
 All notable changes to KJ Des are documented here.
 
+## 1.0.3 — 2026-11-25
+
+Version 1.0.2 was not released as an application version (the `v1.0.2` Git tag
+points at the 1.0.1 code); this release follows 1.0.1.
+
+### Fixed
+- DNS restore no longer gets stuck when Windows recreated an adapter with a new
+  InterfaceGuid (e.g. the Hyper-V "Default Switch" at boot) — GitHub issue #1.
+  Each saved entry is matched to a current adapter first:
+  * saved GUID present -> restore (also when the adapter was renamed);
+  * GUID changed but the same real hardware is proven by its burned-in MAC plus
+    the saved name or description -> restore, verified against the current GUID;
+  * otherwise the decision uses only the saved GUID's own TCP/IP configuration
+    (`HKLM\SYSTEM\CurrentControlSet\Services\Tcpip[6]\Parameters\Interfaces\{GUID}`,
+    read-only): the entry is cleared without any change when that configuration
+    is demonstrably absent, or demonstrably identical to the backup for IPv4 and
+    IPv6 (servers in order). Different settings (e.g. KJ Des' Cloudflare values),
+    a partial or unreadable configuration -> nothing is changed and the backup is
+    kept. A same-named adapter never authorizes clearing; the interface index is
+    never used as identity.
+- Reconnecting after an interrupted restore could record the DNS KJ Des had
+  applied (Cloudflare) as the adapter's "original" when Windows had renamed the
+  adapter in between; the following restore then left Cloudflare in place and
+  deleted the backup. An adapter whose original is already in the backup (same
+  GUID, or proven same hardware) now never gets a second entry. If that cannot
+  be decided safely (two entries for one adapter, same hardware not proven, or
+  an older entry without GUID while the adapter shows KJ Des' DNS), connecting
+  is refused and the backup is kept unchanged. Restore likewise changes nothing
+  when several saved entries match the same adapter.
+- Restore no longer re-applies settings that are already in place.
+- New backups also record the adapter description, burned-in MAC and hardware
+  flag. Older backups stay readable and are never reinterpreted.
+
+### Added
+- `--diagnose` shows each saved backup entry, which adapter it matches and what a
+  restore would do; for a saved GUID that no longer exists it reports that GUID's
+  own IPv4/IPv6 configuration (absent / automatic / static(n) / unreadable),
+  whether it matches the backup, and whether the result is "clear without
+  changes", "retain backup" or "manual recovery required" (read-only).
+- `--self-test` also checks that the registry reader works in the packaged build.
+
 ## 1.0.1 — 2026-11-18
 
+### Fixed
+- Adapters whose name contains characters outside the console code page (for
+  example a renamed or localized Ethernet adapter) were listed as `??Ethernet`
+  and could not be backed up ("Adapter not uniquely resolved"), so connecting was
+  refused. The adapter list is now read as UTF-8 together with each adapter's
+  InterfaceGuid and ifIndex. The DNS snapshot and restore resolve the adapter by
+  GUID and require the same name, two adapters with the same name are refused
+  before anything is read or changed, and the original DNS of every adapter is
+  still restored exactly. Nothing is changed unless every adapter is identified
+  and backed up.
+
 ### Added — diagnostics
+- The report lists each adapter's ifIndex and GUID, the SHA-256 of every
+  presented certificate, and compares presented CA certificates with known
+  genuine fingerprints (report only) to tell a missing root from interception.
 - `KJDes.exe --diagnose`: read-only report written to `%APPDATA%\KJ Des\diagnostics.txt`
   (adapters KJ Des would back up and whether each one's DNS can be read; strict TLS
   result for every DoH provider with the presented certificate chain and whether its

@@ -51,10 +51,16 @@ def normalize_snapshot(snapshot):
             clean["interface_guid"] = str(uuid.UUID(snapshot["interface_guid"]))
         except (ValueError, TypeError, AttributeError) as exc:
             raise DnsSnapshotError("Adaptor kimligi gecersiz") from exc
+    if "identity" in snapshot:
+        from core.adapter_identity import normalize_identity
+        ident = normalize_identity(snapshot["identity"])
+        if ident:
+            clean["identity"] = ident
     return clean
 
 
-_KNOWN_FAILURES = ("Adapter not uniquely resolved", "DNS registry key unavailable",
+_KNOWN_FAILURES = ("Adapter not uniquely resolved", "Adapter identity mismatch",
+                   "DNS registry key unavailable",
                    "Invalid NameServer type", "DNS family unavailable")
 
 
@@ -79,19 +85,35 @@ def powershell_failure_reason(stderr) -> str:
     return reason[:200]
 
 
-def get_dns(adapter_name: str) -> Dict:
+def get_dns(adapter_name: str, interface_guid: Optional[str] = None) -> Dict:
     """Read effective DNS via CIM and static source via per-interface NameServer.
 
     Missing/inaccessible registry keys fail closed. Only a successfully opened
     key with absent/empty NameServer means automatic. No registry writes.
     """
     encoded = base64.b64encode(adapter_name.encode("utf-8")).decode("ascii")
+    # Stable identity: when the GUID is known the adapter is resolved by GUID
+    # and must ALSO carry exactly this name (netsh changes address it by name).
+    want_guid = ""
+    if interface_guid:
+        import uuid
+        try:
+            want_guid = str(uuid.UUID(str(interface_guid)))
+        except (ValueError, TypeError, AttributeError) as exc:
+            raise DnsSnapshotError("Adaptor kimligi gecersiz") from exc
     script = r"""
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $alias = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__ALIAS__'))
-$adapters = @(Get-NetAdapter -IncludeHidden | Where-Object { $_.Name -ceq $alias })
-if ($adapters.Count -ne 1) { throw 'Adapter not uniquely resolved' }
+$wantGuid = '__GUID__'
+if ($wantGuid) {
+    $adapters = @(Get-NetAdapter -IncludeHidden | Where-Object { ([guid]$_.InterfaceGuid).ToString() -eq $wantGuid })
+    if ($adapters.Count -ne 1) { throw 'Adapter not uniquely resolved: guid' }
+    if ($adapters[0].Name -cne $alias) { throw 'Adapter identity mismatch: name differs for guid' }
+} else {
+    $adapters = @(Get-NetAdapter -IncludeHidden | Where-Object { $_.Name -ceq $alias })
+    if ($adapters.Count -ne 1) { throw ('Adapter not uniquely resolved: name matches=' + $adapters.Count) }
+}
 $adapter = $adapters[0]
 $guid = ([guid]$adapter.InterfaceGuid).ToString()
 $result = @{interface_guid=$guid}
@@ -111,7 +133,7 @@ foreach ($family in @(@('ipv4','Tcpip','IPv4'), @('ipv6','Tcpip6','IPv6'))) {
     $result[$family[0]] = @{dhcp=($static.Count -eq 0); servers=$static; effective=@($rows[0].ServerAddresses)}
 }
 $result | ConvertTo-Json -Depth 5 -Compress
-""".replace("__ALIAS__", encoded)
+""".replace("__ALIAS__", encoded).replace("__GUID__", want_guid)
     try:
         result = subprocess.run(
             ["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
@@ -211,7 +233,7 @@ def restore_dns(adapter_name: str, snapshot: Dict) -> Tuple[bool, str]:
     try:
         wanted = normalize_snapshot(snapshot)
         if wanted.get("interface_guid"):
-            current = get_dns(adapter_name)
+            current = get_dns(adapter_name, wanted["interface_guid"])
             if current.get("interface_guid") != wanted["interface_guid"]:
                 raise DnsSnapshotError("Adaptor kimligi degisti")
     except Exception as exc:
@@ -243,7 +265,7 @@ def restore_dns(adapter_name: str, snapshot: Dict) -> Tuple[bool, str]:
                 break
     if not errors:
         try:
-            actual = normalize_snapshot(get_dns(adapter_name))
+            actual = normalize_snapshot(get_dns(adapter_name, wanted.get("interface_guid")))
             for family in ("ipv4", "ipv6"):
                 expected = wanted[family]
                 observed = actual[family]

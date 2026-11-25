@@ -46,6 +46,7 @@
   "err_admin": "Administrator permission is required.",
   "err_verify": "Discord could not be reached through the connection path. Settings were restored.",
   "err_restore_partial": "Some settings could not be restored. Press Restore defaults.",
+  "err_restore_identity": "A network adapter changed since its settings were saved and cannot be matched safely, so its DNS was not changed. See Activity.",
   "err_relay_stopped": "The connection engine stopped. Original settings were restored.",
   "err_hosts_removed": "Routing was removed by another program. Original settings were restored.",
   "err_cancelled": "Operation cancelled. Original settings were restored.",

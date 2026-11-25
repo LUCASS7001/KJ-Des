@@ -205,7 +205,8 @@ class PartialAndRecovery(unittest.TestCase):
 
     def test_startup_failure_sets_restore_pending(self):
         ops = FakeOps()
-        ops.store = {"Wi-Fi": dhcp_snapshot()}
+        guid = ops.dns["Wi-Fi"]["interface_guid"]
+        ops.store = {"Wi-Fi": static_snapshot(["192.168.1.53"], guid=guid)}   # live is DHCP: must restore
         ops.fail["restore_dns"] = True
         mgr, ops, _ = make(ops)
         self.assertFalse(mgr.recover_on_startup())

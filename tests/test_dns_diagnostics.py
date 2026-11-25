@@ -65,10 +65,10 @@ class GetDnsFailClosed(unittest.TestCase):
         _, run = self._run(1, stderr="x")
         script = run.call_args[0][0][-1]
         self.assertIn("$ErrorActionPreference = 'Stop'", script)
-        for marker in ("Adapter not uniquely resolved", "DNS registry key unavailable",
-                       "Invalid NameServer type", "DNS family unavailable"):
-            self.assertIn(f"throw ('{marker}" if marker != "Adapter not uniquely resolved"
-                          else f"throw '{marker}'", script)
+        for marker in ("Adapter not uniquely resolved", "Adapter identity mismatch",
+                       "DNS registry key unavailable", "Invalid NameServer type",
+                       "DNS family unavailable"):
+            self.assertTrue(f"throw '{marker}" in script or f"throw ('{marker}" in script, marker)
         # no registry or network writes from the snapshot script
         for forbidden in ("SetValue", "Set-DnsClient", "netsh", "New-Item", "Remove-"):
             self.assertNotIn(forbidden, script)
@@ -88,11 +88,11 @@ class OneUnreadableAdapterBlocksEverything(unittest.TestCase):
                       dns={"Wi-Fi": dhcp_snapshot(), "VPN Adapter": dhcp_snapshot()})
         real_get = ops.get_dns
 
-        def get_dns(name):
+        def get_dns(name, guid=None):
             if name == "VPN Adapter":
                 raise dns_manager.DnsSnapshotError(
                     "Windows DNS sorgusu basarisiz | neden=DNS family unavailable: ipv4 (no DNS client entry) | kod=1")
-            return real_get(name)
+            return real_get(name, guid)
         ops.get_dns = get_dns
         log = MemoryLog()
         mgr = ConnectionManager(ops, log.write, source_dev=True)
@@ -153,7 +153,7 @@ class DiagnoseReport(unittest.TestCase):
             language_fn=lambda: "FullLanguage", is_admin_fn=lambda: True)
 
     def test_report_pinpoints_unreadable_adapter_and_missing_root(self):
-        def get_dns(name):
+        def get_dns(name, guid=None):
             if name == "VPN Adapter":
                 raise dns_manager.DnsSnapshotError("Windows DNS sorgusu basarisiz | neden=DNS family unavailable: ipv4")
             return dhcp_snapshot()

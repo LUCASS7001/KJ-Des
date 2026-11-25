@@ -6,7 +6,7 @@
 
 **A Windows desktop connectivity utility for Discord.**
 
-Windows 10 / 11 · العربية · Türkçe · English · v1.0.1
+Windows 10 / 11 · العربية · Türkçe · English · v1.0.3
 
 </div>
 

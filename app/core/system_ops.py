@@ -45,8 +45,17 @@ class SystemOps:
         except Exception:
             return None
 
-    def get_dns(self, adapter: str) -> Dict:
-        return dns_manager.get_dns(adapter)
+    def read_guid_dns_config(self, guid):
+        """Read-only registry view of an interface GUID's DNS configuration."""
+        from core.adapter_identity import read_guid_dns_config
+        return read_guid_dns_config(guid)
+
+    def list_adapter_identities(self):
+        from core.adapter_identity import list_adapter_identities
+        return list_adapter_identities()
+
+    def get_dns(self, adapter: str, guid: Optional[str] = None) -> Dict:
+        return dns_manager.get_dns(adapter, guid)
 
     def set_secure_dns(self, adapter: str) -> Tuple[bool, str]:
         return dns_manager.set_dns(adapter, DNS_V4[0], DNS_V4[1], DNS_V6[0], DNS_V6[1])

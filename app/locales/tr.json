@@ -46,6 +46,7 @@
   "err_admin": "Yönetici izni gerekiyor.",
   "err_verify": "Bağlantı yolu üzerinden Discord'a ulaşılamadı. Ayarlar geri yüklendi.",
   "err_restore_partial": "Bazı ayarlar geri yüklenemedi. Varsayılana dön'e basın.",
+  "err_restore_identity": "Bir ağ bağdaştırıcısı, ayarları kaydedildikten sonra değişti ve güvenle eşleştirilemiyor; bu yüzden DNS'i değiştirilmedi. Ayrıntılar Etkinlik bölümünde.",
   "err_relay_stopped": "Bağlantı motoru durdu. Orijinal ayarlar geri yüklendi.",
   "err_hosts_removed": "Yönlendirme başka bir program tarafından kaldırıldı. Ayarlar geri yüklendi.",
   "err_cancelled": "İşlem iptal edildi. Orijinal ayarlar geri yüklendi.",

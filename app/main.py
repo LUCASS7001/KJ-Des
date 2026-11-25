@@ -125,6 +125,12 @@ def self_test(out_path: str) -> int:
     about = AboutDialog(i18n, window)
     assert about.branding.links, "branding.json not bundled"
     assert notice_path(), "NOTICE.md not bundled"
+    # registry reader works in the packaged runtime (read-only; a fresh random
+    # GUID can only be 'absent' — unreadable would mean the reader is broken)
+    import uuid
+    from core.adapter_identity import read_guid_dns_config
+    probe = read_guid_dns_config(str(uuid.uuid4()))
+    assert probe["exists"] is False, f"registry reader: {probe}"
     about._retranslate_all()
     about.setAttribute(Qt.WA_DontShowOnScreen)
     about.show()

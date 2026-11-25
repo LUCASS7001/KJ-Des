@@ -33,6 +33,31 @@ from core.app_info import APP_VERSION
 
 DOH_HOSTS_SOURCE = "core.discord_unblock._DOH_ENDPOINTS"
 
+# SHA-256 of GENUINE CA certificates in the DoH providers' chains, recorded on a
+# known-good Windows installation (2026-11-18). REPORT-ONLY: used to tell a
+# missing root apart from TLS interception; never used to trust anything.
+# Leaf certificates rotate and are deliberately not listed.
+KNOWN_GENUINE_CA = {
+    "948B7111AF42F546D579CFF5CE2BDEC82134DD9914842BDDB0C52872EB604E39":
+        "SSL.com SSL Intermediate CA ECC R2 (Cloudflare DoH)",
+    "3417BB06CC6007DA1B961C920B8AB4CE3FAD820E4AA30B9ACBC4A74EBDCEBC65":
+        "SSL.com Root Certification Authority ECC",
+}
+
+
+def ca_verdict(presented: List[Dict]) -> str:
+    """Compare the presented CA certificates (index >= 1) with known genuine ones."""
+    cas = [c for c in presented[1:] if c.get("sha256")]
+    if not cas:
+        return "no CA certificate presented; cannot compare"
+    if all(c["sha256"] in KNOWN_GENUINE_CA for c in cas):
+        return ("presented CA certificate(s) match the genuine ones by fingerprint -> "
+                "no interception; the trust anchor is missing from this PC's Windows store")
+    if any(c["sha256"] in KNOWN_GENUINE_CA for c in cas):
+        return "partly matches the genuine chain; inspect the fingerprints above"
+    return ("presented CA certificate(s) do NOT match the genuine ones -> the connection "
+            "is likely intercepted (antivirus HTTPS scanning, proxy or network filter)")
+
 
 # ── certificate helpers ───────────────────────────────────────────────────
 def _decode(der: bytes) -> Dict:
@@ -101,9 +126,11 @@ def tls_check(host: str, timeout: float = 8.0,
 
 
 def _describe(der) -> Dict:
+    import hashlib
     info = _decode(der)
     return {"subject": _name(info, "subject"), "issuer": _name(info, "issuer"),
-            "not_after": info.get("notAfter", "?")}
+            "not_after": info.get("notAfter", "?"),
+            "sha256": hashlib.sha256(bytes(der)).hexdigest().upper()}
 
 
 # ── report ────────────────────────────────────────────────────────────────
@@ -129,7 +156,9 @@ def _snapshot_summary(snap: Dict) -> str:
 
 def build_report(*, adapters_fn, get_dns_fn, doh_fn, tls_fn=tls_check,
                  roots_fn=windows_root_names, language_fn=_language_mode,
-                 is_admin_fn=lambda: False, summary: Optional[Dict] = None) -> str:
+                 is_admin_fn=lambda: False, summary: Optional[Dict] = None,
+                 backup_fn=lambda: {}, identities_fn=lambda: [],
+                 guid_config_fn=None) -> str:
     """Pure report builder; every system access is injected (testable)."""
     from core.discord_unblock import _DOH_ENDPOINTS
     L: List[str] = []
@@ -156,8 +185,9 @@ def build_report(*, adapters_fn, get_dns_fn, doh_fn, tls_fn=tls_check,
     for a in adapters:
         name = a.get("name", "?")
         w(f"  - {name!r}  source={a.get('source', '?')}  type={a.get('type', '')!r}")
+        w(f"      ifIndex={a.get('if_index')}  guid={a.get('guid')}")
         try:
-            w(f"      DNS read: OK — {_snapshot_summary(get_dns_fn(name))}")
+            w(f"      DNS read: OK — {_snapshot_summary(get_dns_fn(name, a.get('guid')))}")
         except Exception as exc:
             blocked += 1
             w(f"      DNS read: FAILED — {exc}"[:300])
@@ -184,7 +214,10 @@ def build_report(*, adapters_fn, get_dns_fn, doh_fn, tls_fn=tls_check,
         chain = r.get("presented_chain") or []
         for i, c in enumerate(chain):
             w(f"      presented[{i}] {c['subject']!r} <- issued by {c['issuer']!r}")
+            if c.get("sha256"):
+                w(f"                   sha256={c['sha256']}")
         if chain:
+            w(f"      fingerprint check: {ca_verdict(chain)}")
             needed = chain[-1]["issuer"]
             present = needed in roots
             w(f"      issuer needed: {needed!r} -> in Windows ROOT store: {present}")
@@ -207,7 +240,96 @@ def build_report(*, adapters_fn, get_dns_fn, doh_fn, tls_fn=tls_check,
         w(f"  FAILED: {type(exc).__name__}: {exc}"[:240])
     for ln in lines:
         w("  " + ln[:240])
+    w("")
+    _backup_section(w, backup_fn, identities_fn, get_dns_fn, summary, guid_config_fn)
     return "\n".join(L) + "\n"
+
+
+def _backup_section(w, backup_fn, identities_fn, get_dns_fn, summary,
+                    guid_config_fn=None) -> None:
+    """What a restore WOULD do for each saved entry. Strictly read-only:
+    nothing is written to the registry, DNS, adapters or the backup."""
+    from core.adapter_identity import (GUID, VERIFIED, describe_cfg, dns_equivalent,
+                                       orphan_verdict, resolve_restore_target)
+    from core.dns_manager import normalize_snapshot
+    w("== 4. Saved DNS backup (what a restore would do) ==")
+    try:
+        backup = backup_fn() or {}
+    except Exception as exc:
+        w(f"  backup unreadable: {type(exc).__name__}")
+        return
+    if not backup:
+        w("  (none) — nothing left to restore")
+        return
+    adapters = identities_fn()
+    pending = 0
+    for name, raw in backup.items():
+        try:
+            snap = normalize_snapshot(raw)
+        except Exception as exc:
+            w(f"  - {name!r}: invalid entry ({exc}) -> retain backup")
+            pending += 1
+            continue
+        d = resolve_restore_target(name, snap, adapters)
+        a = d["adapter"]
+        saved = "/".join("automatic" if snap[f]["dhcp"] else f"static({len(snap[f]['servers'])})"
+                         for f in ("ipv4", "ipv6"))
+        w(f"  - {name!r} saved guid={snap.get('interface_guid')} dns={saved}"
+          f" identity_metadata={'yes' if snap.get('identity') else 'no'}")
+        if d["kind"] in (GUID, VERIFIED):
+            w(f"      match: {d['kind']} -> {a.get('name')!r} if={a.get('if_index')} guid={a.get('guid')}"
+              f" ({d['reason']})")
+            try:
+                same = dns_equivalent(snap, get_dns_fn(a["name"], a.get("guid")))
+            except Exception as exc:
+                w(f"      would: retain backup (current DNS unreadable: {exc})"[:240])
+                pending += 1
+                continue
+            if same["all"]:
+                w("      would: clear without changes — current DNS already matches")
+            else:
+                w("      would: restore the saved DNS to this adapter (identity proven)")
+            continue
+        if d.get("saved_guid_listed") is False:
+            w("      saved GUID is not present among current adapters")
+            if a is not None:
+                w(f"      hint only (never used to decide): adapter with the saved name -> "
+                  f"{a.get('name')!r} if={a.get('if_index')} guid={a.get('guid')}")
+            if guid_config_fn is None:
+                w("      saved GUID configuration: not checked -> retain backup")
+                pending += 1
+                continue
+            try:
+                cfg = guid_config_fn(snap["interface_guid"])
+                v = orphan_verdict(snap, cfg)
+            except Exception as exc:
+                w(f"      saved GUID configuration: unreadable ({type(exc).__name__})")
+                w("      would: retain backup")
+                pending += 1
+                continue
+            exists = {True: "yes", False: "no", None: "unknown"}[cfg.get("exists")]
+            w(f"      saved GUID TCP/IP configuration exists: {exists}")
+            for fam in ("ipv4", "ipv6"):
+                c = cfg[fam]
+                extra = f" — {c['detail']}" if c.get("detail") else ""
+                w(f"        {fam}: {describe_cfg(c)}{extra}")
+            w(f"      matches the backup: ipv4={v['ipv4_same']} ipv6={v['ipv6_same']}")
+            if v["clear"]:
+                why = "configuration absent" if v["verdict"] == "clear_absent" else "configuration identical"
+                w(f"      would: clear without changes ({why})")
+            elif v["verdict"] == "retain_unreadable":
+                w("      would: retain backup (configuration could not be read reliably; retried next time)")
+                pending += 1
+            else:
+                w("      would: manual recovery required — the saved GUID still holds DNS settings that"
+                  " differ from the backup (or only one family exists); KJ Des changes nothing")
+                pending += 1
+            continue
+        w(f"      match: {d['kind']} ({d['reason']})")
+        w("      would: retain backup, change nothing")
+        pending += 1
+    if summary is not None:
+        summary["backup_blocked"] = pending
 
 
 EXIT_OK = 0          # report written, no blocking problem found
@@ -223,6 +345,21 @@ def exit_code(summary: Dict) -> int:
     return EXIT_OK
 
 
+def _load_backup():
+    from core import secure_store
+    return secure_store.load_dns_backup()
+
+
+def _guid_config(guid):
+    from core.adapter_identity import read_guid_dns_config
+    return read_guid_dns_config(guid)
+
+
+def _identities():
+    from core.adapter_identity import list_adapter_identities
+    return list_adapter_identities()
+
+
 def run(out_path: str, summary: Optional[Dict] = None) -> str:
     """Collect the report with the real (read-only) system calls."""
     from core import adapter_manager, dns_manager
@@ -230,10 +367,13 @@ def run(out_path: str, summary: Optional[Dict] = None) -> str:
     from security.elevation import is_admin
     text = build_report(
         adapters_fn=adapter_manager.get_active_adapters,
-        get_dns_fn=dns_manager.get_dns,
+        get_dns_fn=lambda name, guid=None: dns_manager.get_dns(name, guid),
         doh_fn=lambda host, log: doh_resolve(host, log=log),
         is_admin_fn=is_admin,
         summary=summary,
+        backup_fn=_load_backup,
+        identities_fn=_identities,
+        guid_config_fn=_guid_config,
     )
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as f:

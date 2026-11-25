@@ -18,6 +18,15 @@ def get_all_adapters() -> List[Dict]:
     return _get_all_adapters_netsh()
 
 
+def _clean_guid(value):
+    """Canonical lowercase GUID string, or None if missing/invalid."""
+    import uuid
+    try:
+        return str(uuid.UUID(str(value)))
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
 def _get_all_adapters_powershell() -> List[Dict]:
     """Get-NetAdapter nesne ciktisi dil bagimsiz oldugu icin once bunu dener."""
     try:
@@ -28,12 +37,18 @@ def _get_all_adapters_powershell() -> List[Dict]:
                 "-ExecutionPolicy",
                 "Bypass",
                 "-Command",
-                "Get-NetAdapter | Select-Object Name,Status,AdminStatus,InterfaceDescription | ConvertTo-Json -Compress",
+                # UTF-8 output: Windows PowerShell 5.1 otherwise writes the OEM
+                # code page and turns non-ASCII adapter names into '?' (e.g.
+                # '??Ethernet'), so the name would match no real adapter.
+                "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); "
+                "Get-NetAdapter | Select-Object Name,Status,AdminStatus,InterfaceDescription,"
+                "@{n='Guid';e={([guid]$_.InterfaceGuid).ToString()}},ifIndex,PermanentAddress,"
+                "HardwareInterface | ConvertTo-Json -Compress",
             ],
             capture_output=True,
             text=True,
             encoding="utf-8",
-            errors="ignore",
+            errors="strict",
             timeout=10,
             creationflags=subprocess.CREATE_NO_WINDOW,
         )
@@ -58,6 +73,11 @@ def _get_all_adapters_powershell() -> List[Dict]:
                     "state": "Connected" if status_l == "up" else status or "Disconnected",
                     "type": item.get("InterfaceDescription") or "",
                     "source": "powershell",
+                    "guid": _clean_guid(item.get("Guid")),
+                    "if_index": item.get("ifIndex") if isinstance(item.get("ifIndex"), int) else None,
+                    "permanent_mac": item.get("PermanentAddress") or None,
+                    "hardware": item.get("HardwareInterface")
+                    if isinstance(item.get("HardwareInterface"), bool) else None,
                 }
             )
         return [a for a in adapters if a["name"]]

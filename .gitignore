@@ -57,3 +57,7 @@ docs/screenshots/_preview_config.json*
 *.key
 *.cer
 *.spc
+
+# Test-only TLS fixture (throwaway, untrusted test CA; see tests/data/tls/README.md)
+!tests/data/tls/leaf.key
+!tests/data/tls/leaf.pem
