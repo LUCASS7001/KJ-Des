@@ -3,10 +3,6 @@
 Thanks for your interest in KJ Des. Bug reports and suggestions are welcome
 through the issue tracker.
 
-KJ Des is not released under an open-source license (see `LICENSE`). By
-submitting a pull request you agree that your contribution may be included in
-KJ Des under the project's terms; the maintainer may decline contributions.
-
 ## Development setup
 
 ```powershell
